@@ -1,0 +1,36 @@
+# Arduino build output
+build/
+*.bin
+*.elf
+*.map
+*.hex
+
+# Arduino IDE cache
+.arduino15/
+**/.cache/
+
+# Libraries (managed separately)
+libraries/
+
+# VS Code
+.vscode/
+
+# JetBrains IDEs
+.idea/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Claude Code
+.claude/
+
+# Credentials / secrets
+secrets.h
+credentials.h
+*.key
+*.pem
