@@ -3,10 +3,10 @@
 #include <Preferences.h>
 
 // ─── BLE UUID ────────────────────────────────────────────────────────────────
-// Standard ELM327 BLE UUIDs — update with the real ones read from nRF Connect
-#define BLE_SERVICE_UUID  "0000fff0-0000-1000-8000-00805f9b34fb"
-#define BLE_WRITE_UUID    "0000fff2-0000-1000-8000-00805f9b34fb"
-#define BLE_NOTIFY_UUID   "0000fff1-0000-1000-8000-00805f9b34fb"
+// Vgate iCar Pro BLE (IOS-VLINK) — single characteristic for write + notify
+#define BLE_SERVICE_UUID  "e7810a71-73ae-499d-8c15-faa9aef0c3f2"
+#define BLE_WRITE_UUID    "bef8d6c9-9c21-4c9e-b632-bd58c1009f9f"
+#define BLE_NOTIFY_UUID   "bef8d6c9-9c21-4c9e-b632-bd58c1009f9f"
 
 // ─── Pins ────────────────────────────────────────────────────────────────────
 #define PIN_BTN1      0

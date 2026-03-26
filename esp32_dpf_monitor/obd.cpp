@@ -24,7 +24,7 @@ static void bleNotifyCallback(BLERemoteCharacteristic*, uint8_t* data, size_t le
 class OBDScanCallback : public BLEAdvertisedDeviceCallbacks {
   void onResult(BLEAdvertisedDevice dev) override {
     String name = dev.getName().c_str(); name.toUpperCase();
-    if (name.indexOf("OBD")>=0 || name.indexOf("ELM")>=0 || name.indexOf("VGATE")>=0) {
+    if (name.indexOf("OBD")>=0 || name.indexOf("ELM")>=0 || name.indexOf("VGATE")>=0 || name.indexOf("VLINK")>=0) {
       bleFoundDev = new BLEAdvertisedDevice(dev);
       BLEDevice::getScan()->stop();
     }
