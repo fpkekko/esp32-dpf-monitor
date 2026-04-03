@@ -10,3 +10,4 @@ bool readDPF();
 bool readBattery();
 bool readEngineData();
 void updateRegenLog();
+void startOBDTask();   // launch OBD polling on core 0

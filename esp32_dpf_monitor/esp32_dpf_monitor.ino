@@ -85,6 +85,7 @@ void setup() {
     tft.setCursor(20, 184); tft.print("Display active, WiFi config OK");
   } else {
     initELM();
+    startOBDTask();   // OBD polling moves to core 0 — UI stays free
   }
   delay(1500);
   tft.fillScreen(C_BG);
@@ -106,21 +107,15 @@ void loop() {
   if (btn2Last==HIGH && b2==LOW) { currentPage=(currentPage+1)%4;   tft.fillScreen(C_BG); needsRedraw=true; delay(30); }
   btn1Last=b1; btn2Last=b2;
 
-  // Poll OBD
-  static uint32_t lastPoll=0;
-  if (vd.btConnected && millis()-lastPoll >= (uint32_t)cfg.pollMs) {
-    lastPoll=millis();
-    readBattery(); readDPF(); readEngineData();
-    updateRegenLog();
-    vd.dataValid=true;
-    needsRedraw=true;
-  }
+  // Check for new OBD data from background task
+  if (vd.newData) { vd.newData=false; needsRedraw=true; }
 
   // Alarm blink tick (500 ms)
   static uint32_t lastAlarmTick=0;
   bool hasAlarm = vd.dataValid && (vd.dpfPct>=cfg.dpfCrit || vd.dpfRegen ||
                   vd.oilTempC>=cfg.oilCrit || vd.turboBar>2.2f ||
-                  (!vd.altOk&&vd.engineOn) || vd.battV<cfg.battLow);
+                  (!vd.altOk&&vd.engineOn) ||
+                  (vd.battV<cfg.battLow && millis()-vd.engineStartMs>60000UL));
   if (hasAlarm && millis()-lastAlarmTick>=500) {
     lastAlarmTick=millis();
     needsRedraw=true;

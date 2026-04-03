@@ -33,7 +33,7 @@
 #define OIL_CRIT_DEFAULT     120
 #define COOLANT_WARN_DEFAULT 98
 #define BATT_LOW_DEFAULT     11.8f
-#define ALT_MIN_DEFAULT      13.2f
+#define ALT_MIN_DEFAULT      12.8f
 
 // ─── Colour palette ──────────────────────────────────────────────────────────
 #define C_BG    0x0000
@@ -86,14 +86,14 @@ const CarProfile PROFILES[] = {
     "Opel Astra J",
     "1.7 CDTI A17DTR 110cv",
     "2011",
-    "Delco E87",
+    "DENSO (A17DTR)",
     "ATSP6",
     "7E0",
-    "22336A",      // soot % → A  (0-100)
-    "2220FA",      // regen active → bit 0 [to be verified]
-    "222010",      // DPF temp → (A*256+B)/10-40 [to be verified]
-    "220B00",      // diff pressure [verify with Tech2/GDS2]
-    "22336B",      // km since regen → A*256+B
+    "22336A",      // soot % → A/255*100  (0-255 → 0-100%)
+    "223274",      // regen active → v>0 (0=off, 1-255=progress)
+    "223279",      // DPF temp °C → A*5-40  (1-byte, -40..1235°C)
+    "2220F4",      // diff pressure mbar → SIGNED(A)
+    "223277",      // km since regen → A*65536+B*256+C  (3-byte)
     false,
     0
   }
@@ -132,7 +132,9 @@ struct VehicleData {
   int   oilTempC=0, coolantTempC=0, rpm=0;
   float turboBar=0;
   float battV=0;
-  bool  engineOn=false, altOk=true, btConnected=false, dataValid=false;
+  bool     engineOn=false, altOk=true, btConnected=false, dataValid=false;
+  uint32_t engineStartMs=0;      // millis() when engine last turned on
+  volatile bool newData=false;   // set by OBD task, cleared by UI loop
 };
 extern VehicleData vd;
 

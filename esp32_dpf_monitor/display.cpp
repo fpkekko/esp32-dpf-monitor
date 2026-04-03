@@ -63,7 +63,7 @@ void drawGlobalAlarm() {
   else if (vd.oilTempC>=cfg.oilCrit) drawAlarm("OIL CRITICAL - STOP THE VEHICLE");
   else if (vd.turboBar>2.2f)          drawAlarm("TURBO OVERPRESSURE");
   else if (!vd.altOk&&vd.engineOn)    drawAlarm("ALTERNATOR FAULT - SEE A MECHANIC");
-  else if (vd.battV<cfg.battLow)      drawAlarm("BATTERY LOW");
+  else if (vd.battV<cfg.battLow && millis()-vd.engineStartMs>60000UL) drawAlarm("BATTERY LOW");
   else if (regenForced)               drawAlarm("REPEATED FORCED REGENS - CHECK DPF");
   else                                tft.fillRect(0,150,320,20,C_BG);
 }

@@ -1,5 +1,6 @@
 #include "webui.h"
 #include "config.h"
+#include "obd.h"
 
 #include <FS.h>
 using namespace fs;
@@ -8,12 +9,14 @@ static void handleData();
 static void handleSave();
 static void handleReset();
 static void handleRoot();
+static void handleRawPID();
 
 void initWebServer() {
   server.on("/",        HTTP_GET,  handleRoot);
   server.on("/save",    HTTP_POST, handleSave);
   server.on("/data",    HTTP_GET,  handleData);
   server.on("/reset",   HTTP_POST, handleReset);
+  server.on("/raw",     HTTP_GET,  handleRawPID);
   server.onNotFound([](){server.send(404,"text/plain","Not found");});
 }
 
@@ -236,4 +239,115 @@ static void handleRoot() {
         "</script></body></html>";
 
   server.send(200,"text/html",html);
+}
+
+// ─── Raw PID diagnostic page ──────────────────────────────────────────────────
+// GET /raw?pid=2102FF  →  returns raw adapter response as plain text
+// GET /raw             →  returns a simple HTML test form
+static void handleRawPID() {
+  if (server.hasArg("pid")) {
+    String pid = server.arg("pid");
+    pid.trim(); pid.toUpperCase();
+    int ms = server.hasArg("ms") ? server.arg("ms").toInt() : 2000;
+    ms = constrain(ms, 500, 10000);
+    String raw = sendOBD(pid, ms);
+    if (raw.isEmpty()) raw = "(no response / timeout)";
+    server.send(200, "text/plain", "CMD: " + pid + "\nRAW: " + raw);
+    return;
+  }
+  // No PID arg — serve the diagnostic page
+  String html = "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+    "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+    "<title>PID Diagnostic</title>"
+    "<style>"
+    "body{background:#0f172a;color:#e2e8f0;font-family:monospace;padding:20px;max-width:700px}"
+    "h2{color:#60a5fa;margin-bottom:4px}"
+    "h3{color:#94a3b8;margin:16px 0 6px}"
+    "input,select{background:#1e293b;color:#e2e8f0;border:1px solid #334155;"
+    "border-radius:6px;padding:8px 12px;font-size:15px}"
+    "input[type=text]{width:160px}"
+    "button{background:#2563eb;color:#fff;border:none;border-radius:6px;"
+    "padding:8px 16px;font-size:15px;cursor:pointer;margin-left:6px}"
+    "button.red{background:#dc2626}"
+    "button.gray{background:#475569}"
+    "pre{background:#1e293b;padding:12px;border-radius:8px;margin-top:10px;"
+    "font-size:13px;min-height:36px;border:1px solid #334155;white-space:pre-wrap;word-break:break-all}"
+    ".hit{color:#4ade80} .miss{color:#475569} .prog{color:#fbbf24}"
+    "a{color:#60a5fa} hr{border-color:#1e293b;margin:20px 0}"
+    "</style></head><body>"
+
+    "<h2>PID Diagnostic</h2>"
+    "<p style='color:#94a3b8;margin-top:0'>Send any AT command or PID and see the raw response.</p>"
+
+    // ── Single command ──
+    "<h3>Single command</h3>"
+    "<div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap'>"
+    "<input id='pid' value='2102FF' placeholder='PID or AT cmd' maxlength='20'>"
+    "<input id='ms' type='number' value='2000' min='500' max='10000' style='width:80px' title='timeout ms'>"
+    "<button onclick='sendPid()'>Send</button>"
+    "</div>"
+    "<pre id='out'>— response will appear here —</pre>"
+    "<p style='color:#64748b;font-size:12px'>"
+    "Quick tests: 0100 &nbsp; ATRV &nbsp; ATDPN &nbsp; 2102FF &nbsp; 22F190 &nbsp; 1001 &nbsp; 1003</p>"
+
+    "<hr>"
+
+    // ── Auto scan ──
+    "<h3>Auto scan (finds all responding PIDs)</h3>"
+    "<div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap'>"
+    "<select id='prefix'>"
+    "<option value='2102'>Mode 21 — 2102XX (PSA DPF)</option>"
+    "<option value='2201'>Mode 22 — 2201XX</option>"
+    "<option value='2220'>Mode 22 — 2220XX</option>"
+    "<option value='2213'>Mode 22 — 2213XX</option>"
+    "<option value='0101'>Mode 01 — 0101XX</option>"
+    "</select>"
+    "<button onclick='startScan()' id='btnScan'>Scan</button>"
+    "<button class='red' onclick='stopScan()' id='btnStop' style='display:none'>Stop</button>"
+    "</div>"
+    "<div id='prog' style='color:#fbbf24;margin-top:8px;font-size:13px'></div>"
+    "<pre id='scanOut' style='min-height:80px'>— scan results will appear here —</pre>"
+
+    "<hr>"
+    "<p><a href='/'>&#8592; Back to config</a></p>"
+
+    "<script>"
+    // Single send
+    "function sendPid(){"
+    "var p=document.getElementById('pid').value.trim();"
+    "var ms=document.getElementById('ms').value||2000;"
+    "document.getElementById('out').textContent='Sending '+p+'...';"
+    "fetch('/raw?pid='+encodeURIComponent(p)+'&ms='+ms)"
+    ".then(r=>r.text()).then(t=>document.getElementById('out').textContent=t)"
+    ".catch(e=>document.getElementById('out').textContent='Error: '+e);}"
+    "document.getElementById('pid').addEventListener('keydown',"
+    "function(e){if(e.key==='Enter')sendPid();});"
+
+    // Scan logic
+    "var scanning=false,scanIdx=0,scanPrefix='';"
+    "function startScan(){"
+    "scanPrefix=document.getElementById('prefix').value;"
+    "scanning=true;scanIdx=0;"
+    "document.getElementById('scanOut').textContent='';"
+    "document.getElementById('btnScan').style.display='none';"
+    "document.getElementById('btnStop').style.display='';"
+    "scanNext();}"
+    "function stopScan(){"
+    "scanning=false;"
+    "document.getElementById('btnScan').style.display='';"
+    "document.getElementById('btnStop').style.display='none';"
+    "document.getElementById('prog').textContent='Stopped at '+scanIdx+'/256';}"
+    "function scanNext(){"
+    "if(!scanning||scanIdx>=256){if(scanning)stopScan();return;}"
+    "var hex=(scanIdx).toString(16).toUpperCase().padStart(2,'0');"
+    "var pid=scanPrefix+hex;"
+    "document.getElementById('prog').textContent='Scanning '+pid+' ('+scanIdx+'/256)';"
+    "fetch('/raw?pid='+pid+'&ms=1500')"
+    ".then(r=>r.text()).then(t=>{"
+    "if(t.indexOf('NO DATA')<0&&t.indexOf('timeout')<0&&t.indexOf('?')<0){"
+    "document.getElementById('scanOut').textContent+='\\u2705 '+t+'\\n';}"
+    "scanIdx++;scanNext();})"
+    ".catch(()=>{scanIdx++;scanNext();});}"
+    "</script></body></html>";
+  server.send(200, "text/html", html);
 }
